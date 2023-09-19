@@ -1,7 +1,7 @@
 - name: Fetch webapp
   ansible.posix.synchronize:
     mode: pull
-    src: /home/isucon/webapp/
+    src: /home/isucon/private_isu/webapp/
     dest: ../../../../webapp/
 
 - name: Fetch etc/mysql

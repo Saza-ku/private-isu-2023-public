@@ -6,7 +6,7 @@
   roles:
     - role: install
 
-- hosts: isucon2
+- hosts: isucon1
   gather_facts: false
   become: true
   roles:

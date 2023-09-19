@@ -3,7 +3,7 @@
 - name: Deploy app
   ansible.posix.synchronize:
     src: ../../../../webapp/
-    dest: /home/isucon/webapp
+    dest: /home/isucon/private_isu/webapp
     mode: push
     delete: false
 
@@ -85,7 +85,7 @@
 - name: Fix owner of webapp
   become: true
   file:
-    path: /home/isucon/webapp
+    path: /home/isucon/private_isu/webapp
     owner: isucon
     group: isucon
     recurse: yes

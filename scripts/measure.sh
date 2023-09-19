@@ -3,12 +3,11 @@ set -eux
 
 cd `dirname $0`
 
-# TODO: settings
-MYSQL_USER=root
-MYSQL_PASS=root
-MYSQL_DBNAME=
-GITHUB_TOKEN=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
-GITHUB_REPO=
+MYSQL_USER=isuconp
+MYSQL_PASS=isuconp
+MYSQL_DBNAME=isuconp
+GITHUB_TOKEN=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
+GITHUB_REPO=Saza-ku/private-isu-2023
 
 # Clear logs
 sudo test -f /var/log/nginx/access.log && sudo sh -c 'echo -n "" > /var/log/nginx/access.log'
