@@ -262,6 +262,14 @@ func getTemplPath(filename string) string {
 
 func getInitialize(w http.ResponseWriter, r *http.Request) {
 	dbInitialize()
+	go func() {
+		cmd := exec.Command("/home/isucon/scripts/measure.sh")
+		_, err := cmd.Output()
+		cmd.Stderr = os.Stderr
+		if err != nil {
+			fmt.Println("Command Error", err)
+		}
+	}()
 	w.WriteHeader(http.StatusOK)
 }
 

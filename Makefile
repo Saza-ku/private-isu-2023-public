@@ -20,4 +20,4 @@ fulldeploy: build
 
 .PHONY: build
 build:
-	cd webapp/go && GOOS=linux GOARCH=amd64 make
+	cd webapp/golang && GOOS=linux GOARCH=amd64 make
