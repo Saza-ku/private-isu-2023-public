@@ -5,13 +5,9 @@ help:
 
 .PHONY: deploy
 deploy: build
-	rsync -a webapp isucon@isucon1:/home/isucon/ & \
-	rsync -a webapp isucon@isucon2:/home/isucon/ & \
-	rsync -a webapp isucon@isucon3:/home/isucon/ & \
+	rsync -a webapp isucon@isucon1:/home/isucon/private_isu/ & \
 	wait
 	ssh isucon@isucon1 /home/isucon/scripts/restart.sh & \
-	ssh isucon@isucon2 /home/isucon/scripts/restart.sh & \
-	ssh isucon@isucon3 /home/isucon/scripts/restart.sh & \
 	wait
 
 .PHONY: fulldeploy
