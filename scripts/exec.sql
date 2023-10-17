@@ -4,4 +4,10 @@
 /*ALTER TABLE `comments` ADD INDEX `comments_post_id_index` (`post_id` ASC, `created_at` DESC);
 */
 
-ALTER TABLE `posts` ADD INDEX `posts_created_at_index` (`created_at` DESC);
+/*LTER TABLE `posts` ADD INDEX `posts_created_at_index` (`created_at` DESC);
+*/
+
+CREATE VIEW `not_banned_posts` AS
+SELECT posts.id, posts.user_id, posts.mime, posts.imgdata, posts.body, posts.created_at FROM
+`posts` JOIN `users` ON `posts`.`user_id` = `users`.`id`
+WHERE `users`.`del_flg` = 0;
