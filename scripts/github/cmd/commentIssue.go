@@ -102,7 +102,7 @@ func buildComment(server string, date string) (string, error) {
 {{.Netdata}}
 
 ### pprof
-http://{{.Server}}/pprof/{{.Date}}/profile
+go tool pprof -http=0.0.0.0:1080 http://{{.Server}}/pprof/{{.Date}}
 `)
 	if err != nil {
 		return "", err
