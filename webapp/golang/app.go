@@ -175,7 +175,7 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 	}
 }
 
-func getUsersByIdList(idList []int) []User {
+func getUsersByIdList(idList []int) map[int]User {
 	query, params, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", idList)
 	if err != nil {
 		panic(err)
@@ -186,16 +186,12 @@ func getUsersByIdList(idList []int) []User {
 		panic(err)
 	}
 
-	return users
-}
-
-func getAllUsers() []User {
-	var users []User
-	if err := db.Select(&users, "SELECT * FROM users"); err != nil {
-		panic(err)
+	ret := make(map[int]User)
+	for _, u := range users {
+		ret[u.ID] = u
 	}
 
-	return users
+	return ret
 }
 
 func getCommentsByPostIdList(idList []int) map[int][]Comment {
@@ -221,26 +217,25 @@ func getCommentsByPostIdList(idList []int) map[int][]Comment {
 }
 
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
-	var posts []Post
-	userIdList := make([]int, 0)
-	for _, p := range results {
-		userIdList = append(userIdList, p.UserID)
-		for _, c := range p.Comments {
-			userIdList = append(userIdList, c.UserID)
-		}
-	}
-
-	// TODO: getUsersByIdList で必要な分だけ取得するようにしたい
-	users := getAllUsers()
-	usersMap := s2m(users, func(u User) int {
-		return u.ID
-	})
-
 	postsIdList := make([]int, 0)
 	for _, p := range results {
 		postsIdList = append(postsIdList, p.ID)
 	}
 	commentsMap := getCommentsByPostIdList(postsIdList)
+
+	var posts []Post
+	userIdList := make([]int, 0)
+	for _, p := range results {
+		userIdList = append(userIdList, p.UserID)
+	}
+	for _, comments := range commentsMap {
+		for _, comment := range comments {
+			userIdList = append(userIdList, comment.UserID)
+		}
+	}
+
+	// TODO: getUsersByIdList で必要な分だけ取得するようにしたい
+	usersMap := getUsersByIdList(userIdList)
 
 	for _, p := range results {
 		err := db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
