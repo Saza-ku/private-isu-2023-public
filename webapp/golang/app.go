@@ -188,6 +188,15 @@ func getUsersByIdList(idList []int) []User {
 	return users
 }
 
+func getAllUsers() []User {
+	var users []User
+	if err := db.Select(&users, "SELECT * FROM users"); err != nil {
+		panic(err)
+	}
+
+	return users
+}
+
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
 	var posts []Post
 	userIdList := make([]int, 0)
@@ -198,7 +207,8 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 		}
 	}
 
-	users := getUsersByIdList(userIdList)
+	// TODO: getUsersByIdList で必要な分だけ取得するようにしたい
+	users := getAllUsers()
 	usersMap := s2m(users, func(u User) int {
 		return u.ID
 	})
