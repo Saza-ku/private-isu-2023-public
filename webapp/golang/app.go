@@ -237,11 +237,24 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 	// TODO: getUsersByIdList で必要な分だけ取得するようにしたい
 	usersMap := getUsersByIdList(userIdList)
 
+	// get comments count by post_id using GROUP BY
+	type CommentCount struct {
+		PostID int `db:"post_id"`
+		Count  int `db:"count"`
+	}
+	commentCounts := []CommentCount{}
+	query, params, err := sqlx.In("SELECT `post_id`, COUNT(*) AS `count` FROM `comments` WHERE `post_id` IN (?) GROUP BY `post_id`", postsIdList)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Select(&commentCounts, query, params...)
+	if err != nil {
+		return nil, err
+	}
+	commentCountMap := s2m(commentCounts, func(c CommentCount) int { return c.PostID })
+
 	for _, p := range results {
-		err := db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
-		if err != nil {
-			return nil, err
-		}
+		p.CommentCount = commentCountMap[p.ID].Count
 
 		comments := commentsMap[p.ID]
 		if !allComments && len(comments) > 3 {
