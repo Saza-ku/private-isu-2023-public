@@ -22,13 +22,15 @@ DATE=`date +"%m%d%I%M"`
 sleep 5
 {% endif %}
 
+# pprof
+mkdir -p ~/results/$DATE
+curl -o ~/results/$DATE/pprof/profile http://localhost:6060/debug/pprof/profile\?seconds=70 &
+
 sleep 75
 
 TO=`date +%s%N | cut -b1-13`
 
 # Measure
-mkdir -p ~/results/$DATE
-
 sudo mysqldumpslow -s t /var/log/mysql/slow.log | head -n 30 > ~/results/$DATE/mysql-slow.log
 sudo cat /var/log/mysql/slow.log | pt-query-digest --explain \
     u=$MYSQL_USER,p=$MYSQL_PASS,D=$MYSQL_DBNAME --limit 4 \

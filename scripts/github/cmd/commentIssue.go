@@ -77,6 +77,7 @@ type Comment struct {
 	MySQLSlowLog string
 	MySQLExplain string
 	Netdata      string
+	Date         string
 }
 
 func buildComment(server string, date string) (string, error) {
@@ -99,6 +100,9 @@ func buildComment(server string, date string) (string, error) {
 
 ### netdata
 {{.Netdata}}
+
+### pprof
+http://{{.Server}}/pprof/{{.Date}}/profile
 `)
 	if err != nil {
 		return "", err
@@ -130,6 +134,7 @@ func buildComment(server string, date string) (string, error) {
 		MySQLSlowLog: slowQuery,
 		MySQLExplain: explain,
 		Netdata:      netdata,
+		Date:         date,
 	}
 
 	var b bytes.Buffer
