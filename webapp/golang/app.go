@@ -207,6 +207,28 @@ func getAllUsers() []User {
 	return users
 }
 
+func getCommentsByPostIdList(idList []int) map[int][]Comment {
+	query, params, err := sqlx.In("SELECT * FROM comments WHERE post_id IN (?) ORDER BY `created_at` DESC", idList)
+	if err != nil {
+		panic(err)
+	}
+
+	var comments []Comment
+	if err := db.Select(&comments, query, params...); err != nil {
+		panic(err)
+	}
+
+	ret := make(map[int][]Comment)
+	for _, c := range comments {
+		if _, ok := ret[c.PostID]; !ok {
+			ret[c.PostID] = make([]Comment, 0)
+		}
+		ret[c.PostID] = append(ret[c.PostID], c)
+	}
+
+	return ret
+}
+
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
 	var posts []Post
 	userIdList := make([]int, 0)
@@ -223,20 +245,21 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 		return u.ID
 	})
 
+	postsIdList := make([]int, 0)
+	for _, p := range results {
+		postsIdList = append(postsIdList, p.ID)
+	}
+	commentsMap := getCommentsByPostIdList(postsIdList)
+
 	for _, p := range results {
 		err := db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
 		if err != nil {
 			return nil, err
 		}
 
-		query := "SELECT * FROM `comments` WHERE `post_id` = ? ORDER BY `created_at` DESC"
-		if !allComments {
-			query += " LIMIT 3"
-		}
-		var comments []Comment
-		err = db.Select(&comments, query, p.ID)
-		if err != nil {
-			return nil, err
+		comments := commentsMap[p.ID]
+		if !allComments && len(comments) > 3 {
+			comments = comments[:3]
 		}
 
 		for i := 0; i < len(comments); i++ {
