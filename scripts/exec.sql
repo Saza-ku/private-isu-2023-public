@@ -43,4 +43,8 @@ CREATE TABLE IF NOT EXISTS `not_banned_posts_without_imgdata` (
 );
 */
 
+/*
 ALTER TABLE `comments` ADD INDEX `comments_user_id_index` (`user_id` ASC);
+*/
+
+ALTER TABLE `not_banned_posts_without_imgdata` ADD INDEX `not_banned_posts_user_id_created_at_index` (`user_id`, `created_at` DESC);
