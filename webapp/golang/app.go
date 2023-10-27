@@ -83,6 +83,7 @@ func dbInitialize() {
 	sqls := []string{
 		"DELETE FROM users WHERE id > 1000",
 		"DELETE FROM posts WHERE id > 10000",
+		"DELETE FROM posts_without_imgdata WHERE id > 10000",
 		"DELETE FROM comments WHERE id > 100000",
 		"UPDATE users SET del_flg = 0",
 		"UPDATE users SET del_flg = 1 WHERE id % 50 = 0",
@@ -90,6 +91,13 @@ func dbInitialize() {
 
 	for _, sql := range sqls {
 		db.Exec(sql)
+	}
+}
+
+func imageInitialize() {
+	err := exec.Command("/bin/rm", "-rf", "/home/isucon/image/*").Run()
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -298,6 +306,7 @@ func getTemplPath(filename string) string {
 
 func getInitialize(w http.ResponseWriter, r *http.Request) {
 	dbInitialize()
+	imageInitialize()
 
 	go func() {
 		cmd := exec.Command("/home/isucon/scripts/measure.sh")
@@ -431,7 +440,7 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 
 	results := []Post{}
 
-	err := db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `not_banned_posts` ORDER BY `created_at` DESC LIMIT 20")
+	err := db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `not_banned_posts_without_imgdata` ORDER BY `created_at` DESC LIMIT 20")
 	if err != nil {
 		log.Print(err)
 		return
@@ -477,7 +486,7 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 
 	results := []Post{}
 
-	err = db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `not_banned_posts` WHERE `user_id` = ? ORDER BY `created_at` DESC LIMIT 20", user.ID)
+	err = db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `not_banned_posts_without_imgdata` WHERE `user_id` = ? ORDER BY `created_at` DESC LIMIT 20", user.ID)
 	if err != nil {
 		log.Print(err)
 		return
@@ -497,7 +506,7 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 	}
 
 	postIDs := []int{}
-	err = db.Select(&postIDs, "SELECT `id` FROM `not_banned_posts` WHERE `user_id` = ? LIMIT 20", user.ID)
+	err = db.Select(&postIDs, "SELECT `id` FROM `not_banned_posts_without_imgdata` WHERE `user_id` = ? LIMIT 20", user.ID)
 	if err != nil {
 		log.Print(err)
 		return
@@ -565,7 +574,7 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	results := []Post{}
-	err = db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `not_banned_posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC LIMIT 20", t.Format(ISO8601Format))
+	err = db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `not_banned_posts_without_imgdata` WHERE `created_at` <= ? ORDER BY `created_at` DESC LIMIT 20", t.Format(ISO8601Format))
 	if err != nil {
 		log.Print(err)
 		return
@@ -601,7 +610,7 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	results := []Post{}
-	err = db.Select(&results, "SELECT * FROM `not_banned_posts` WHERE `id` = ?", pid)
+	err = db.Select(&results, "SELECT * FROM `not_banned_posts_without_imgdata` WHERE `id` = ?", pid)
 	if err != nil {
 		log.Print(err)
 		return
@@ -693,12 +702,11 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := "INSERT INTO `posts` (`user_id`, `mime`, `imgdata`, `body`) VALUES (?,?,?,?)"
+	query := "INSERT INTO `posts_without_imgdata` (`user_id`, `mime`, `body`) VALUES (?,?,?)"
 	result, err := db.Exec(
 		query,
 		me.ID,
 		mime,
-		filedata,
 		r.FormValue("body"),
 	)
 	if err != nil {
@@ -712,39 +720,27 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
-}
-
-func getImage(w http.ResponseWriter, r *http.Request) {
-	pidStr := chi.URLParam(r, "id")
-	pid, err := strconv.Atoi(pidStr)
+	// create image file
+	ext := ""
+	if mime == "image/jpeg" {
+		ext = ".jpg"
+	} else if mime == "image/png" {
+		ext = ".png"
+	} else if mime == "image/gif" {
+		ext = ".gif"
+	}
+	f, err := os.Create("/home/isucon/image/" + strconv.FormatInt(pid, 10) + ext)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		log.Print(err)
 		return
 	}
-
-	post := Post{}
-	err = db.Get(&post, "SELECT * FROM `posts` WHERE `id` = ?", pid)
+	_, err = f.Write(filedata)
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	ext := chi.URLParam(r, "ext")
-
-	if ext == "jpg" && post.Mime == "image/jpeg" ||
-		ext == "png" && post.Mime == "image/png" ||
-		ext == "gif" && post.Mime == "image/gif" {
-		w.Header().Set("Content-Type", post.Mime)
-		_, err := w.Write(post.Imgdata)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-		return
-	}
-
-	w.WriteHeader(http.StatusNotFound)
+	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
 }
 
 func postComment(w http.ResponseWriter, r *http.Request) {
@@ -886,7 +882,6 @@ func main() {
 	r.Get("/posts", getPosts)
 	r.Get("/posts/{id}", getPostsID)
 	r.Post("/", postIndex)
-	r.Get("/image/{id}.{ext}", getImage)
 	r.Post("/comment", postComment)
 	r.Get("/admin/banned", getAdminBanned)
 	r.Post("/admin/banned", postAdminBanned)
