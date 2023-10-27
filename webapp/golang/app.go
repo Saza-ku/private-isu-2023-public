@@ -87,6 +87,8 @@ func dbInitialize() {
 		"DELETE FROM comments WHERE id > 100000",
 		"UPDATE users SET del_flg = 0",
 		"UPDATE users SET del_flg = 1 WHERE id % 50 = 0",
+		"DELETE FROM not_banned_posts_without_imgdata WHERE id > 10000",
+		"INSERT INTO not_banned_posts_without_imgdata SELECT * FROM posts_without_imgdata WHERE user_id NOT IN (SELECT id FROM users WHERE del_flg = 1)",
 	}
 
 	for _, sql := range sqls {
@@ -702,7 +704,7 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := "INSERT INTO `posts_without_imgdata` (`user_id`, `mime`, `body`) VALUES (?,?,?)"
+	query := "INSERT INTO `not_banned_posts_without_imgdata` (`user_id`, `mime`, `body`) VALUES (?,?,?)"
 	result, err := db.Exec(
 		query,
 		me.ID,
@@ -825,8 +827,19 @@ func postAdminBanned(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, id := range r.Form["uid[]"] {
+	idList := r.Form["uid[]"]
+
+	for _, id := range idList {
 		db.Exec(query, 1, id)
+	}
+
+	q, a, err := sqlx.In("DELETE FROM `not_banned_posts_without_imgdata` WHERE `user_id` IN (?)", idList)
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Exec(q, a...)
+	if err != nil {
+		panic(err)
 	}
 
 	http.Redirect(w, r, "/admin/banned", http.StatusFound)
