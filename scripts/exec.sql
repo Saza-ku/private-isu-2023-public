@@ -31,6 +31,7 @@ SELECT p.id, p.user_id, p.mime, p.body, p.created_at FROM
 WHERE `users`.`del_flg` = 0;
 */
 
+/*
 CREATE TABLE IF NOT EXISTS `not_banned_posts_without_imgdata` (
   `id` int NOT NULL AUTO_INCREMENT,
   `user_id` int NOT NULL,
@@ -40,3 +41,6 @@ CREATE TABLE IF NOT EXISTS `not_banned_posts_without_imgdata` (
   PRIMARY KEY (`id`),
   KEY `posts_without_imgdata_created_at_index` (`created_at` DESC)
 );
+*/
+
+ALTER TABLE `comments` ADD INDEX `comments_user_id_index` (`user_id` ASC);
