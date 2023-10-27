@@ -29,8 +29,7 @@ var (
 	db    *sqlx.DB
 	store *gsm.MemcacheStore
 
-	mu         *sync.Mutex
-	postsCache map[int]Post = map[int]Post{}
+	mu *sync.Mutex
 )
 
 const (
@@ -175,8 +174,44 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 	}
 }
 
+func getUsersByIdList(idList []int) []User {
+	query, params, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", idList)
+	if err != nil {
+		panic(err)
+	}
+
+	var users []User
+	if err := db.Select(&users, query, params...); err != nil {
+		panic(err)
+	}
+
+	return users
+}
+
+func getAllUsers() []User {
+	var users []User
+	if err := db.Select(&users, "SELECT * FROM users"); err != nil {
+		panic(err)
+	}
+
+	return users
+}
+
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
 	var posts []Post
+	userIdList := make([]int, 0)
+	for _, p := range results {
+		userIdList = append(userIdList, p.UserID)
+		for _, c := range p.Comments {
+			userIdList = append(userIdList, c.UserID)
+		}
+	}
+
+	// TODO: getUsersByIdList で必要な分だけ取得するようにしたい
+	users := getAllUsers()
+	usersMap := s2m(users, func(u User) int {
+		return u.ID
+	})
 
 	for _, p := range results {
 		err := db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
@@ -195,9 +230,10 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 		}
 
 		for i := 0; i < len(comments); i++ {
-			err := db.Get(&comments[i].User, "SELECT * FROM `users` WHERE `id` = ?", comments[i].UserID)
-			if err != nil {
-				return nil, err
+			var ok bool
+			comments[i].User, ok = usersMap[comments[i].UserID]
+			if !ok {
+				return nil, fmt.Errorf("makePosts: user not found")
 			}
 		}
 
@@ -208,9 +244,10 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 
 		p.Comments = comments
 
-		err = db.Get(&p.User, "SELECT * FROM `users` WHERE `id` = ?", p.UserID)
-		if err != nil {
-			return nil, err
+		var ok bool
+		p.User, ok = usersMap[p.UserID]
+		if !ok {
+			return nil, fmt.Errorf("makePosts: user not found")
 		}
 
 		p.CSRFToken = csrfToken
@@ -261,8 +298,6 @@ func getTemplPath(filename string) string {
 
 func getInitialize(w http.ResponseWriter, r *http.Request) {
 	dbInitialize()
-
-	postsCache = map[int]Post{}
 
 	go func() {
 		cmd := exec.Command("/home/isucon/scripts/measure.sh")
@@ -861,4 +896,12 @@ func main() {
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", r))
+}
+func s2m[T any, K comparable](s []T, proj func(T) K) map[K]T {
+	m := map[K]T{}
+
+	for _, v := range s {
+		m[proj(v)] = v
+	}
+	return m
 }

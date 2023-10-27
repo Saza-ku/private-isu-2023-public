@@ -4,7 +4,7 @@
 /*ALTER TABLE `comments` ADD INDEX `comments_post_id_index` (`post_id` ASC, `created_at` DESC);
 */
 
-/*LTER TABLE `posts` ADD INDEX `posts_created_at_index` (`created_at` DESC);
+/*ALTER TABLE `posts` ADD INDEX `posts_created_at_index` (`created_at` DESC);
 */
 
 CREATE VIEW `not_banned_posts` AS
