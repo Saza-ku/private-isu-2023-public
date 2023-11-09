@@ -2,9 +2,8 @@
 
 ### /etc/hosts
 ```
- isucon1
- isucon2
- isucon3
+153.125.129.158 isucon1
+153.125.146.245 bench
 ```
 
 ### SSH forwarding for netdata
