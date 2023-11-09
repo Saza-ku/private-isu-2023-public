@@ -7,15 +7,18 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	_ "net/http/pprof"
@@ -39,6 +42,8 @@ const (
 	postsPerPage  = 20
 	ISO8601Format = "2006-01-02T15:04:05-07:00"
 	UploadLimit   = 10 * 1024 * 1024 // 10mb
+
+	sockAddr = "/run/isu.sock"
 )
 
 type User struct {
@@ -909,8 +914,8 @@ func main() {
 	}
 	defer db.Close()
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
+	db.SetMaxOpenConns(35)
+	db.SetMaxIdleConns(35)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	r := chi.NewRouter()
@@ -933,8 +938,32 @@ func main() {
 		http.FileServer(http.Dir("../public")).ServeHTTP(w, r)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", r))
+	// unix domain socket
+	os.Remove(sockAddr)
+
+	listener, err := net.Listen("unix", sockAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer listener.Close()
+	os.Chmod(sockAddr, 0777)
+
+	shutdown(listener)
+	log.Fatal(http.Serve(listener, r))
 }
+
+func shutdown(listener net.Listener) {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		if err := listener.Close(); err != nil {
+			log.Printf("error: %v", err)
+		}
+		os.Exit(1)
+	}()
+}
+
 func s2m[T any, K comparable](s []T, proj func(T) K) map[K]T {
 	m := map[K]T{}
 
