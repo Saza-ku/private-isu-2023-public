@@ -1,9 +1,19 @@
 ## ISUCON X
 
 ### /etc/hosts
+
+さくらのクラウド
+
 ```
 153.125.129.158 isucon1
 153.125.146.245 bench
+```
+
+AWS
+
+```
+35.79.24.88 isucon1
+35.77.37.198 bench
 ```
 
 ### SSH forwarding for netdata

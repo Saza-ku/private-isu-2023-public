@@ -181,6 +181,10 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 }
 
 func getUsersByIdList(idList []int) map[int]User {
+	if (len(idList)) == 0 {
+		return map[int]User{}
+	}
+
 	query, params, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", idList)
 	if err != nil {
 		panic(err)
@@ -200,6 +204,9 @@ func getUsersByIdList(idList []int) map[int]User {
 }
 
 func getCommentsByPostIdList(idList []int) map[int][]Comment {
+	if (len(idList)) == 0 {
+		return map[int][]Comment{}
+	}
 	query, params, err := sqlx.In("SELECT * FROM comments WHERE post_id IN (?) ORDER BY `created_at` DESC", idList)
 	if err != nil {
 		panic(err)
@@ -222,6 +229,10 @@ func getCommentsByPostIdList(idList []int) map[int][]Comment {
 }
 
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
+	if (len(results)) == 0 {
+		return []Post{}, nil
+	}
+
 	postsIdList := make([]int, 0)
 	for _, p := range results {
 		postsIdList = append(postsIdList, p.ID)
