@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	crand "crypto/rand"
 	"crypto/sha512"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -35,7 +37,9 @@ var (
 	db    *sqlx.DB
 	store *gsm.MemcacheStore
 
-	mu *sync.Mutex
+	mu sync.Mutex
+
+	getIndexCache map[int][]byte
 )
 
 const (
@@ -348,6 +352,8 @@ func getInitialize(w http.ResponseWriter, r *http.Request) {
 	dbInitialize()
 	imageInitialize()
 
+	getIndexCache = map[int][]byte{}
+
 	go func() {
 		cmd := exec.Command("/home/isucon/scripts/measure.sh")
 		_, err := cmd.Output()
@@ -474,6 +480,14 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 
 	results := []Post{}
 
+	mu.Lock()
+	cache, ok := getIndexCache[me.ID]
+	mu.Unlock()
+	if ok {
+		w.Write(cache)
+		return
+	}
+
 	err := db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `not_banned_posts_without_imgdata` ORDER BY `created_at` DESC LIMIT 20")
 	if err != nil {
 		log.Print(err)
@@ -486,12 +500,41 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	getIndexTemplate.Execute(w, struct {
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	var buf bytes.Buffer
+	template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
+		getTemplPath("layout.html"),
+		getTemplPath("index.html"),
+		getTemplPath("posts.html"),
+		getTemplPath("post.html"),
+	)).Execute(&buf, struct {
 		Posts     []Post
 		Me        User
 		CSRFToken string
 		Flash     string
 	}{posts, me, getCSRFToken(r), getFlash(w, r, "notice")})
+
+	mu.Lock()
+	getIndexCache[me.ID] = buf.Bytes()
+	mu.Unlock()
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	w.Write(buf.Bytes())
+}
+
+func EncodeResults(results []Post) (string, error) {
+	b, err := json.Marshal(results)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func getAccountName(w http.ResponseWriter, r *http.Request) {
@@ -741,6 +784,8 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resetCache()
+
 	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
 }
 
@@ -768,6 +813,8 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+
+	resetCache()
 
 	http.Redirect(w, r, fmt.Sprintf("/posts/%d", postID), http.StatusFound)
 }
@@ -845,6 +892,8 @@ func main() {
 	go func() {
 		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
 	}()
+
+	getIndexCache = map[int][]byte{}
 
 	host := os.Getenv("ISUCONP_DB_HOST")
 	if host == "" {
@@ -980,6 +1029,13 @@ func shutdown(listener net.Listener) {
 		}
 		os.Exit(1)
 	}()
+}
+
+func resetCache() {
+	mu.Lock()
+	getIndexCache = map[int][]byte{}
+	mu.Unlock()
+
 }
 
 func s2m[T any, K comparable](s []T, proj func(T) K) map[K]T {
